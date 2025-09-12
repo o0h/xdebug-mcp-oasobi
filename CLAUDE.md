@@ -33,41 +33,70 @@ php -i | grep xdebug.output_dir
 
 ### 実行時環境変数設定（推奨アプローチ）
 
-**最も効果的な方法：実行時の一時的環境変数設定**
+**最も効果的な方法：.xdebugrc設定ファイルアプローチ**
 ```bash
-# ✅ 推奨：実行時に環境変数を一時的に設定（システム設定変更不要）
-XDEBUG_MODE=develop,trace ./vendor/bin/xdebug-trace --context="説明" -- php script.php
+# 1回目のセットアップ（プロジェクトルートに作成）
+echo "export XDEBUG_MODE=develop,trace" > .xdebugrc
+echo "export XDEBUG_OUTPUT_DIR=/tmp" >> .xdebugrc
 
-# 複数変数の同時設定
+# 以降の使用（推奨）
+source .xdebugrc && ./vendor/bin/xdebug-profile --context="分析内容" -- php script.php
+source .xdebugrc && ./vendor/bin/xdebug-trace --context="分析内容" -- php script.php
+
+# 従来の方法（代替手段）
+XDEBUG_MODE=develop,trace ./vendor/bin/xdebug-trace --context="説明" -- php script.php
 XDEBUG_MODE=develop,trace XDEBUG_OUTPUT_DIR=/tmp ./vendor/bin/xdebug-trace --context="説明" -- php script.php
 ```
 
+**なぜ.xdebugrcアプローチが優れているか:**
+- ✅ php.ini変更不要（システム影響なし）
+- ✅ MCPツールのフォールバックを避けられる
+- ✅ 設定を1箇所で管理
+- ✅ チーム内で設定共有可能
+- ✅ プロジェクト固有の設定が可能
+
 ### xdebug-mcpツール実行時のベストプラクティス
 ```bash
-# トレース実行の推奨コマンド
-XDEBUG_MODE=develop,trace ./vendor/bin/xdebug-trace --context="N+1クエリとメモリリーク分析" -- php ./app debug:buggy performance 10
+# ✅ 推奨：.xdebugrc使用パターン
+source .xdebugrc && ./vendor/bin/xdebug-trace --context="N+1クエリとメモリリーク分析" -- php ./app debug:buggy performance 10
+source .xdebugrc && ./vendor/bin/xdebug-profile --context="パフォーマンス分析" -- php ./app debug:buggy performance 10
+source .xdebugrc && ./vendor/bin/xdebug-debug --context="ブレークポイント分析" -- php script.php
 
-# デバッグ実行の推奨コマンド  
+# 従来の環境変数直指定パターン（代替手段）
+XDEBUG_MODE=develop,trace ./vendor/bin/xdebug-trace --context="N+1クエリとメモリリーク分析" -- php ./app debug:buggy performance 10
 XDEBUG_MODE=develop,trace ./vendor/bin/xdebug-debug --context="ブレークポイント分析" -- php script.php
 
-# MCPツールが応答しない場合の代替コマンド
+# 最終手段：PHP直接実行パターン（MCPツール完全失敗時のみ）
 env XDEBUG_MODE=trace php -d xdebug.mode=trace -d xdebug.start_with_request=yes -d xdebug.output_dir=/tmp ./app debug:buggy performance 10
 ```
 
-### トラブルシューティング時の段階的アプローチ
+### トラブルシューティング時の段階的アプローチ（2024年9月更新版）
 
-1. **まずMCPツールを試行**
+**推奨フロー：.xdebugrcアプローチ最優先**
+
+1. **.xdebugrc設定ファイルアプローチ（最優先）**
    ```bash
-   # mcp__xdebug__x-trace や mcp__xdebug__x-profile を使用
+   # セットアップ（1回のみ）
+   echo "export XDEBUG_MODE=develop,trace" > .xdebugrc
+   echo "export XDEBUG_OUTPUT_DIR=/tmp" >> .xdebugrc
+   
+   # 実行
+   source .xdebugrc && ./vendor/bin/xdebug-profile --context="分析内容" -- php script.php
    ```
 
-2. **MCPツールが無反応の場合**
+2. **従来のMCPツール試行**
+   ```bash
+   # mcp__xdebug__x-trace や mcp__xdebug__x-profile を使用
+   # ただし"No result"が返ることが多い
+   ```
+
+3. **環境変数直指定による代替実行**
    ```bash
    # 直接バイナリを実行（環境変数付き）
    XDEBUG_MODE=develop,trace ./vendor/bin/xdebug-trace --context="分析内容" -- php script.php
    ```
 
-3. **それでも失敗する場合**
+4. **最終手段：PHP直接実行**
    ```bash
    # PHP直接実行でトレースファイル生成
    env XDEBUG_MODE=trace php -d xdebug.mode=trace -d xdebug.start_with_request=yes -d xdebug.output_dir=/tmp script.php

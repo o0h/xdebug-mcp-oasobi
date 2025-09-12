@@ -1,0 +1,2 @@
+export XDEBUG_MODE=develop,trace
+export XDEBUG_OUTPUT_DIR=/tmp
