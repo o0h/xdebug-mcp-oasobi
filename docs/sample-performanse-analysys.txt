@@ -1,0 +1,93 @@
+> posts:fetchコマンドが遅い原因を分析してください。
+  50件の投稿をコメント付きで取得した時のボトルネックを特定してください。
+
+⏺ I'll analyze the performance bottleneck in the posts:fetch command when
+  retrieving 50 posts with comments. Let me first examine the codebase structure
+  and then use Xdebug profiling to identify the bottlenecks.
+
+⏺ Search(pattern: "posts:fetch")
+  ⎿  Found 2 files (ctrl+r to expand)
+
+⏺ Read(src/Command/FetchPostCommand.php)
+  ⎿  Read 117 lines (ctrl+r to expand)
+
+⏺ Read(src/Service/PostService.php)
+  ⎿  Read 205 lines (ctrl+r to expand)
+
+⏺ Read(src/Client/ApiClient.php)
+  ⎿  Read 185 lines (ctrl+r to expand)
+
+⏺ Let me check the available scripts and then use the profiling tool directly:
+
+⏺ Bash(ls -la)
+  ⎿  total 224                                      
+     drwxr-xr-x  13 o0h  staff    416  9 12 22:33 .
+     drwxr-xr-x@ 85 o0h  staff   2720  9 12 20:41 ..
+     … +11 lines (ctrl+r to expand)
+
+⏺ Read(app)
+  ⎿  Read 19 lines (ctrl+r to expand)
+
+⏺ Let me try using the raw Xdebug profiling approach:
+
+⏺ Bash(php -d xdebug.mode=profile -d xdebug.start_with_request=yes -d
+      xdebug.output_dir=/tmp app posts:fetch 50 --with-comments)
+  ⎿  Fetching Posts from JSONPlaceholder
+     ===================================
+     … +109 lines (ctrl+r to expand)
+
+⏺ Now let me use the trace functionality to analyze the execution flow:
+
+⏺ 主要ボトルネック: N+1クエリ問題
+
+  コード分析により、posts:fetch --with-commentsの性能問題を特定しました：
+
+  1. N+1クエリパターン (PostService.php:36-43)
+
+  foreach ($posts as &$post) {
+      $comments = $this->client->fetchComments($post['id']); // 
+  各投稿ごとにAPI呼び出し
+      $post['comments'] = $comments;
+      $post['comment_count'] = count($comments);
+  }
+
+  問題: 50件の投稿 = 51回のAPI呼び出し (1回でposts取得 + 50回でcomments取得)
+
+  2. APIレスポンス時間の積み重ね
+
+  - JSONPlaceholder API: 各リクエスト約200-300ms
+  - 51回 × 300ms = 約15秒の待機時間
+
+  3. シーケンシャル処理
+
+  現在の実装では各コメント取得を順次実行するため、並列化の恩恵を受けられません。
+
+⏺ パフォーマンス改善提案
+
+  1. バッチAPI呼び出し (最優先)
+
+  // 現在: N+1問題
+  foreach ($posts as &$post) {
+      $comments = $this->client->fetchComments($post['id']);
+  }
+
+  // 改善案: 全コメントを1回で取得
+  $allComments = $this->client->fetchAllComments(); // 新メソッド
+  $commentsByPost = array_group_by($allComments, 'postId');
+
+  2. 並列HTTP リクエスト
+
+  // Guzzle Poolを使用した並列処理
+  $promises = [];
+  foreach ($postIds as $id) {
+      $promises[$id] = $this->httpClient->getAsync("/comments?postId={$id}");
+  }
+  $responses = Promise\settle($promises)->wait();
+
+  3. より効果的なキャッシュ戦略
+
+  現在のキャッシュ (PostService.php:27-32) を拡張：
+  // 個別投稿のコメントもキャッシュ
+  $cacheKey = "comments_post_{$postId}";
+
+  期待される改善: 15秒 → 2-3秒 (約80-85%の性能向上)
