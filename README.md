@@ -171,22 +171,22 @@ debug:buggy recursive 5 の実行で予想と違う結果になる理由を調�
 
 ```bash
 # 条件付きブレークポイント（値がnullの時に停止）
-./vendor/bin/xdebug-debug --break='file.php:line:$var==null' --exit-on-break --json
+./vendor/bin/xdebug-debug --break='file.php:line:$var==null' --exit-on-break --json -- php script.php
 
 # 特定行で必ず停止
-./vendor/bin/xdebug-debug --break='file.php:line' --exit-on-break --json
+./vendor/bin/xdebug-debug --break='file.php:line' --exit-on-break --json -- php script.php
 
 # 複数の条件で停止
-./vendor/bin/xdebug-debug --break='file.php:10:$id==0,file.php:20:empty($name)' --exit-on-break
+./vendor/bin/xdebug-debug --break='file.php:10:$id==0,file.php:20:empty($name)' --exit-on-break -- php script.php
 
 # パフォーマンス分析
-./vendor/bin/xdebug-profile --context="Performance analysis" --json
+./vendor/bin/xdebug-profile --context="Performance analysis" -- php script.php
 
 # 実行トレース（最初の100ステップ）
-./vendor/bin/xdebug-trace --steps=100 --context="Execution flow" --json
+./vendor/bin/xdebug-trace --steps=100 --context="Execution flow" -- php script.php
 
 # コードカバレッジ
-./vendor/bin/xdebug-coverage --context="Test coverage analysis"
+./vendor/bin/xdebug-coverage --context="Test coverage analysis" -- php script.php
 ```
 
 ### 5. トラブルシューティング
