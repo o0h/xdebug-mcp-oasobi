@@ -1,16 +1,16 @@
-# Advanced Performance Debugging with Forward Trace™
+# Forward Trace™による高度なパフォーマンスデバッグ
 
-> **This is where xdebug-mcp truly shines** - complex performance issues that are invisible to static analysis
+> **xdebug-mcpが真価を発揮する場面** - 静的解析では見抜けない複雑なパフォーマンス問題
 
-## The Problem: Hidden N+1 Queries + Complex State Management
+## 問題：隠れたN+1クエリ + 複雑な状態管理
 
-Our new `performance` action demonstrates a realistic scenario where performance issues are deeply hidden:
+新しい`performance`アクションは、パフォーマンス問題が深く隠されている現実的なシナリオを実演します：
 
 ```bash
 ./app debug:buggy performance 20
 ```
 
-### What You See (Deceptively Simple)
+### 表面的に見えること（騙されやすい単純さ）
 ```
 Processing 20 users with advanced algorithms...
 Processed 5 users: 3.76 MB memory
@@ -21,12 +21,12 @@ Final cache size: 80 entries
 Total API calls made: 60
 ```
 
-### What Static Analysis Cannot Reveal
+### 静的解析では見抜けないこと
 
-Looking at the code, it appears to be efficient batch processing:
+コードを見ると、効率的なバッチ処理のように見えます：
 
 ```php
-// This LOOKS efficient - batch processing users
+// これは効率的に見える - ユーザーのバッチ処理
 $users = $userService->getBatchUsers($userIds);
 foreach ($users as $user) {
     $processedUser = $dataProcessor->processUser($user, $cacheManager);
@@ -34,36 +34,36 @@ foreach ($users as $user) {
 }
 ```
 
-**But static analysis cannot tell you:**
-- How many actual API calls are made per user
-- Which processing paths are taken based on user type
-- How much memory each operation actually consumes
-- Where the performance bottlenecks actually occur
-- How the cache state evolves during processing
+**しかし静的解析では以下が分からない：**
+- ユーザー1人あたり実際に何回APIが呼ばれるか
+- ユーザータイプに基づいてどの処理パスが選ばれるか
+- 各操作が実際にどれだけメモリを消費するか
+- パフォーマンスのボトルネックが実際にどこにあるか
+- 処理中にキャッシュの状態がどう変化するか
 
 ---
 
-## Forward Trace™ Analysis: Revealing the Hidden Truth
+## Forward Trace™分析：隠された真実を暴く
 
-### Step 1: Profile the Complete Execution
+### ステップ1：完全な実行をプロファイル
 
 ```bash
-./vendor/koriym/xdebug-mcp/bin/xdebug-profile --context="Performance analysis of user batch processing showing hidden N+1 queries" --steps=1000 -- php ./app debug:buggy performance 10
+./vendor/koriym/xdebug-mcp/bin/xdebug-profile --context="隠れたN+1クエリを示すユーザーバッチ処理のパフォーマンス分析" --steps=1000 -- php ./app debug:buggy performance 10
 ```
 
-### Step 2: Trace Method Execution Pattern
+### ステップ2：メソッド実行パターンをトレース
 
 ```bash  
-./vendor/koriym/xdebug-mcp/bin/xdebug-trace --context="Execution trace revealing N+1 query pattern in batch processing" -- php ./app debug:buggy performance 5
+./vendor/koriym/xdebug-mcp/bin/xdebug-trace --context="バッチ処理におけるN+1クエリパターンを明らかにする実行トレース" -- php ./app debug:buggy performance 5
 ```
 
-### Step 3: Debug Critical Performance Points
+### ステップ3：重要なパフォーマンスポイントをデバッグ
 
-Set breakpoints to analyze state at key moments:
+重要な瞬間で状態を分析するブレークポイントを設定：
 
 ```bash
 ./vendor/koriym/xdebug-mcp/bin/xdebug-debug \
-  --context="Analyzing cache state evolution during user processing" \
+  --context="ユーザー処理中のキャッシュ状態の変遷を分析" \
   --break="BuggyCommand.php:189:$totalProcessed==3" \
   --steps=100 \
   --exit-on-break \
@@ -72,41 +72,41 @@ Set breakpoints to analyze state at key moments:
 
 ---
 
-## What xdebug-mcp Reveals (The Shocking Truth)
+## xdebug-mcpが明らかにすること（衝撃の真実）
 
-### 🔍 **N+1 Query Discovery**
+### 🔍 **N+1クエリの発見**
 
-The trace shows that for each user, the system makes **3 separate API calls**:
-- `getUser($id)` - 1 call
-- `getUserProfile($id)` - 1 call  
-- `getUserPreferences($id)` - 1 call
+トレースは、各ユーザーに対してシステムが**3回の個別APIコール**を行うことを示します：
+- `getUser($id)` - 1回のコール
+- `getUserProfile($id)` - 1回のコール  
+- `getUserPreferences($id)` - 1回のコール
 
-**For 10 users**: 10 × 3 = **30 API calls** instead of the expected 1-3 batch calls.
+**10ユーザーの場合**: 10 × 3 = **30回のAPIコール**（期待される1-3回のバッチコールの代わりに）
 
-### 📊 **Memory Accumulation Pattern**
+### 📊 **メモリ蓄積パターン**
 
-The profile reveals memory usage patterns:
+プロファイルはメモリ使用パターンを明らかにします：
 ```
-User 1: +0.5MB (premium user, complex processing)
-User 2: +0.2MB (standard user, simple processing)  
-User 3: +0.7MB (premium user + cache accumulation)
-User 4: +0.1MB (standard user, cache hit)
-User 5: +0.9MB (premium user + metadata buildup)
+ユーザー1: +0.5MB (プレミアムユーザー、複雑な処理)
+ユーザー2: +0.2MB (スタンダードユーザー、シンプルな処理)  
+ユーザー3: +0.7MB (プレミアムユーザー + キャッシュ蓄積)
+ユーザー4: +0.1MB (スタンダードユーザー、キャッシュヒット)
+ユーザー5: +0.9MB (プレミアムユーザー + メタデータ蓄積)
 ```
 
-### ⏱️ **Performance Bottleneck Identification**
+### ⏱️ **パフォーマンスボトルネックの特定**
 
-Execution time breakdown per user:
-- Premium users: 15-25ms (complex nested processing)
-- Standard users: 5-8ms (simple processing)
-- Cache operations: 2-5ms per store operation
-- **Biggest bottleneck**: `getUserProfile()` calls (2ms each)
+ユーザーあたりの実行時間内訳：
+- プレミアムユーザー: 15-25ms (複雑なネスト処理)
+- スタンダードユーザー: 5-8ms (シンプルな処理)
+- キャッシュ操作: ストア操作あたり2-5ms
+- **最大のボトルネック**: `getUserProfile()`コール (各2ms)
 
-### 🎯 **State Change Tracking**
+### 🎯 **状態変化の追跡**
 
-The debug trace shows exactly how cache state evolves:
+デバッグトレースはキャッシュ状態がどのように変化するかを正確に示します：
 ```
-Step 1: CacheManager->cache = [] (empty)
+Step 1: CacheManager->cache = [] (空)
 Step 15: CacheManager->cache = [user_1 => {...}, user_1_backup => "...", user_1_metadata => {...}]
 Step 23: CacheManager->computationCache[1][1] = [large_array_data]
 Step 31: CacheManager->computationCache[1][2] = [more_data]
@@ -114,63 +114,63 @@ Step 31: CacheManager->computationCache[1][2] = [more_data]
 
 ---
 
-## The Complete Analysis Story
+## 完全な分析ストーリー
 
-### What We Learned That Static Analysis Could Never Reveal:
+### 静的解析では絶対に明らかにならないこと：
 
-1. **Hidden N+1 Problem**: What looks like efficient batch processing actually makes 3× more API calls than necessary
+1. **隠れたN+1問題**: 効率的なバッチ処理に見えるものが、実際には必要な3倍のAPIコールを行っている
 
-2. **Memory Leak Pattern**: Each user creates 3 cache entries (main, backup, metadata) that never get cleaned up
+2. **メモリリークパターン**: 各ユーザーが3つのキャッシュエントリ（メイン、バックアップ、メタデータ）を作成し、それらが決してクリーンアップされない
 
-3. **Processing Complexity**: Premium users require 3 stages × N settings operations, creating unpredictable processing times
+3. **処理の複雑さ**: プレミアムユーザーは3段階 × N設定操作を必要とし、予測不可能な処理時間を生成
 
-4. **Cache Inefficiency**: The cache stores duplicate data (original + serialized backup) for every user
+4. **キャッシュの非効率性**: キャッシュは全ユーザーに対して重複データ（オリジナル + シリアライズされたバックアップ）を保存
 
-5. **Nested Loop Impact**: Premium users with many settings create exponential processing complexity
+5. **ネストループの影響**: 多くの設定を持つプレミアムユーザーが指数的な処理複雑度を生成
 
-### Performance Impact at Scale:
-- **10 users**: 30 API calls, 4.86 MB memory
-- **100 users**: 300 API calls, ~50 MB memory  
-- **1000 users**: 3000 API calls, ~500 MB memory
-
----
-
-## The "Aha!" Moment
-
-**Without xdebug-mcp**: "This code looks efficient, maybe we need faster servers?"
-
-**With xdebug-mcp**: "We have a classic N+1 query problem, memory leaks from redundant cache storage, and exponential complexity in premium user processing!"
-
-### Root Cause Analysis:
-1. `getBatchUsers()` should make 1 batch API call, not N individual calls
-2. `CacheManager` stores redundant data (backup + metadata) 
-3. Premium user processing has O(n×m) complexity where n=users, m=settings
-4. No cache cleanup strategy leads to memory accumulation
+### スケール時のパフォーマンス影響：
+- **10ユーザー**: 30回のAPIコール、4.86 MB メモリ
+- **100ユーザー**: 300回のAPIコール、約50 MB メモリ  
+- **1000ユーザー**: 3000回のAPIコール、約500 MB メモリ
 
 ---
 
-## Why This Showcases Forward Trace™ Superiority
+## 「これだ！」という瞬間
 
-### Traditional Debugging Approach:
-1. "Performance seems slow"
-2. Add `var_dump()` to suspicious places  
-3. Guess where bottlenecks might be
-4. Modify code to add timing measurements
-5. Still unclear on actual execution flow
+**xdebug-mcp無し**: 「このコードは効率的に見える、もしかしてより高速なサーバーが必要？」
 
-### Forward Trace™ Approach:
-1. **One command** captures complete execution story
-2. **Zero code modification** required
-3. **Complete visibility** into method calls, timing, memory, and state changes
-4. **Definitive evidence** of N+1 queries and memory leaks
-5. **Actionable insights** for optimization
+**xdebug-mcpあり**: 「これは典型的なN+1クエリ問題で、冗長なキャッシュストレージによるメモリリーク、そしてプレミアムユーザー処理における指数的複雑度がある！」
 
-This is the difference between **guessing** and **knowing** what your code actually does at runtime.
+### 根本原因分析：
+1. `getBatchUsers()`は1回のバッチAPIコールを行うべきで、N回の個別コールではない
+2. `CacheManager`が冗長データ（バックアップ + メタデータ）を保存している
+3. プレミアムユーザー処理がO(n×m)複雑度を持つ（n=ユーザー数、m=設定数）
+4. キャッシュクリーンアップ戦略が無いためメモリ蓄積が発生
 
 ---
 
-## Conclusion: The True Power of Runtime Intelligence
+## なぜこれがForward Trace™の優位性を示すか
 
-This example demonstrates why xdebug-mcp represents a paradigm shift from static guesswork to runtime intelligence. The performance issues in this code would take hours or days to identify through traditional debugging, but Forward Trace™ reveals them in minutes with definitive proof.
+### 従来のデバッグアプローチ：
+1. 「パフォーマンスが遅いようだ」
+2. 疑わしい場所に`var_dump()`を追加  
+3. ボトルネックがどこにあるか推測
+4. タイミング測定を追加するためコードを修正
+5. 実際の実行フローは依然として不明確
 
-**The key insight**: Modern software complexity requires runtime analysis tools that can capture and analyze the complete execution story, not just static code structure.
+### Forward Trace™アプローチ：
+1. **1つのコマンド**で完全な実行ストーリーを収集
+2. **コード修正不要**
+3. メソッドコール、タイミング、メモリ、状態変化への**完全な可視性**
+4. N+1クエリとメモリリークの**決定的な証拠**
+5. 最適化のための**実行可能な洞察**
+
+これが**推測**と、実行時にコードが実際に何をするかを**知る**ことの違いです。
+
+---
+
+## 結論：実行時インテリジェンスの真の力
+
+この例は、なぜxdebug-mcpが静的推測から実行時インテリジェンスへのパラダイムシフトを表すかを実証しています。このコードのパフォーマンス問題は従来のデバッグでは特定に数時間から数日かかりますが、Forward Trace™は決定的な証拠とともに数分でそれらを明らかにします。
+
+**重要な洞察**: 現代のソフトウェアの複雑さには、静的なコード構造だけでなく、完全な実行ストーリーを収集・分析できる実行時分析ツールが必要です。
