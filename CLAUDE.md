@@ -31,20 +31,24 @@ php -i | grep xdebug.output_dir
    - 設定で出力先が`/tmp/`以外になっている可能性
    - Xdebug 3.x系では`xdebug.output_dir`が正しいパラメータ
 
-### 推奨設定
-環境に応じてXdebugモードを適切に設定:
+### 実行時環境変数設定（推奨アプローチ）
+
+**最も効果的な方法：実行時の一時的環境変数設定**
 ```bash
-# 開発時（デバッグ+トレース両方有効）
-export XDEBUG_MODE=develop,trace
+# ✅ 推奨：実行時に環境変数を一時的に設定（システム設定変更不要）
+XDEBUG_MODE=develop,trace ./vendor/bin/xdebug-trace --context="説明" -- php script.php
+
+# 複数変数の同時設定
+XDEBUG_MODE=develop,trace XDEBUG_OUTPUT_DIR=/tmp ./vendor/bin/xdebug-trace --context="説明" -- php script.php
 ```
 
 ### xdebug-mcpツール実行時のベストプラクティス
 ```bash
 # トレース実行の推奨コマンド
-env XDEBUG_MODE=trace ./vendor/koriym/xdebug-mcp/bin/xdebug-trace --context="説明" -- php script.php
+XDEBUG_MODE=develop,trace ./vendor/bin/xdebug-trace --context="N+1クエリとメモリリーク分析" -- php ./app debug:buggy performance 10
 
 # デバッグ実行の推奨コマンド  
-env XDEBUG_MODE=trace ./vendor/koriym/xdebug-mcp/bin/xdebug-debug --context="説明" -- php script.php
+XDEBUG_MODE=develop,trace ./vendor/bin/xdebug-debug --context="ブレークポイント分析" -- php script.php
 
 # MCPツールが応答しない場合の代替コマンド
 env XDEBUG_MODE=trace php -d xdebug.mode=trace -d xdebug.start_with_request=yes -d xdebug.output_dir=/tmp ./app debug:buggy performance 10
@@ -59,8 +63,8 @@ env XDEBUG_MODE=trace php -d xdebug.mode=trace -d xdebug.start_with_request=yes 
 
 2. **MCPツールが無反応の場合**
    ```bash
-   # 直接バイナリを実行
-   env XDEBUG_MODE=trace ./vendor/bin/xdebug-trace --context="分析内容" -- php script.php
+   # 直接バイナリを実行（環境変数付き）
+   XDEBUG_MODE=develop,trace ./vendor/bin/xdebug-trace --context="分析内容" -- php script.php
    ```
 
 3. **それでも失敗する場合**
@@ -69,3 +73,22 @@ env XDEBUG_MODE=trace php -d xdebug.mode=trace -d xdebug.start_with_request=yes 
    env XDEBUG_MODE=trace php -d xdebug.mode=trace -d xdebug.start_with_request=yes -d xdebug.output_dir=/tmp script.php
    # 生成されたトレースファイルを手動で解析
    ```
+
+### AIエージェント向けの重要な実行指示
+
+**MCPツール失敗時の自動対処法:**
+- MCPツール（`mcp__xdebug__x-trace`, `mcp__xdebug__x-profile`）が"No result"を返す場合
+- 即座に環境変数付きコマンドで再試行すること
+- `XDEBUG_MODE=develop,trace`を前置して実行
+
+**コンテキスト指定の重要性:**
+- `--context`フラグには具体的で説明的な内容を記述
+- 例：`--context="N+1クエリ問題：10ユーザー処理でのAPI呼び出し分析"`
+- 分析結果の可読性と再現性確保のため
+
+**トレースファイル確認コマンド:**
+```bash
+# 最近生成されたトレースファイル検索
+find /usr/local/var/log/php -name "*.xt" -mmin -2 | head -1
+find /tmp -name "*.xt" -mmin -2 | head -1
+```
