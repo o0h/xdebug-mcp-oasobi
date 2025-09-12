@@ -34,7 +34,7 @@ composer install
 ### `debug:buggy` - デバッグ練習用
 ```bash
 ./app debug:buggy <action> [value]
-# actions: null, array, loop, memory, divide, recursive
+# actions: null, array, loop, memory, divide, recursive, performance
 ```
 
 ## xdebug-mcpとの連携
@@ -138,6 +138,35 @@ debug:buggy recursive 5 の実行で予想と違う結果になる理由を調�
 代入演算子と比較演算子の違いによる問題を特定してください。
 ```
 
+**プロンプト例7: 高度なパフォーマンス問題（★xdebug-mcpの真価を発揮）**
+```
+debug:buggy performance 10 コマンドを実行して、隠れたN+1クエリ問題と
+複雑なメモリリークパターンを詳細に分析してください。静的解析では
+絶対に見抜けないパフォーマンス問題をxdebug-mcpで明らかにしてください。
+```
+
+**AIが実行する高度な分析:**
+```bash
+# パフォーマンスプロファイリングでボトルネック特定
+./vendor/bin/xdebug-profile --context="隠れたN+1クエリのパフォーマンス分析" \
+  -- php ./app debug:buggy performance 10
+
+# 実行トレースでメソッド呼び出しパターン確認  
+./vendor/bin/xdebug-trace --context="バッチ処理のN+1パターン追跡" \
+  -- php ./app debug:buggy performance 5
+
+# デバッグで状態変化を詳細分析
+./vendor/bin/xdebug-debug --break='src/Command/BuggyCommand.php:175' \
+  --context="キャッシュ状態とメモリ使用量の追跡" --steps=50 \
+  -- php ./app debug:buggy performance 3
+```
+
+**期待される発見:**
+- 10ユーザーに対して30回のAPIコール（3倍のN+1問題）
+- 1ユーザーあたり3つのキャッシュエントリによるメモリリーク
+- プレミアムユーザー処理が実行時間の16%を占有
+- 複雑な状態変化による予測不可能なメモリ使用パターン
+
 ### 3. AI分析の活用パターン
 
 #### パターンA: エラー特定→修正→テスト
@@ -211,9 +240,18 @@ ls -la src/Command/BuggyCommand.php
 
 ## 含まれている意図的なバグ
 
+### 基本的なバグ（静的解析でも発見可能）
 - `BuggyCommand::handleNullError()` - null参照エラー
 - `BuggyCommand::handleArrayError()` - 配列キーエラー  
 - `BuggyCommand::handleInfiniteLoop()` - 無限ループの可能性
 - `BuggyCommand::recursiveFunction()` - 代入演算子の誤り（`=`を`==`の代わりに使用）
+
+### 高度なパフォーマンス問題（xdebug-mcpでのみ発見可能）
+- `BuggyCommand::handlePerformanceIssue()` - 隠れたN+1クエリ問題
+  - `UserService::getBatchUsers()` - 見た目はバッチ処理だが実際は個別API呼び出し
+  - `CacheManager::storeComplexData()` - 冗長なデータ保存によるメモリリーク
+  - `DataProcessor::processPremiumUser()` - 指数的複雑度による処理時間増大
+  
+**⭐️ 特に`performance`アクションは、Forward Trace™デバッグの真価を体験できる実例です。**
 
 これらのバグをxdebug-mcpで発見・修正してみてください。
