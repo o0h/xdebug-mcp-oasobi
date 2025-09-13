@@ -1,2 +1,3 @@
-export XDEBUG_MODE=develop,trace
+export XDEBUG_MODE=develop,trace,profile,coverage,debug
 export XDEBUG_OUTPUT_DIR=/tmp
+export XDEBUG_TRACE_FORMAT=1

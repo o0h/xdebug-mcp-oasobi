@@ -36,8 +36,9 @@ php -i | grep xdebug.output_dir
 **最も効果的な方法：.xdebugrc設定ファイルアプローチ**
 ```bash
 # 1回目のセットアップ（プロジェクトルートに作成）
-echo "export XDEBUG_MODE=develop,trace" > .xdebugrc
+echo "export XDEBUG_MODE=develop,trace,profile,coverage,debug" > .xdebugrc
 echo "export XDEBUG_OUTPUT_DIR=/tmp" >> .xdebugrc
+echo "export XDEBUG_TRACE_FORMAT=1" >> .xdebugrc
 
 # 以降の使用（推奨）
 source .xdebugrc && ./vendor/bin/xdebug-profile --context="分析内容" -- php script.php
@@ -47,6 +48,28 @@ source .xdebugrc && ./vendor/bin/xdebug-trace --context="分析内容" -- php sc
 XDEBUG_MODE=develop,trace ./vendor/bin/xdebug-trace --context="説明" -- php script.php
 XDEBUG_MODE=develop,trace XDEBUG_OUTPUT_DIR=/tmp ./vendor/bin/xdebug-trace --context="説明" -- php script.php
 ```
+
+### 📍 各ツールの内部動作と必須設定
+
+#### xdebug-trace
+- **必須**: `-dxdebug.mode=trace`と`-dxdebug.start_with_request=yes`
+- **出力**: `/tmp/trace.*.xt`形式でファイル生成
+- **形式**: `-dxdebug.trace_format=1`で詳細データ出力
+
+#### xdebug-profile  
+- **必須**: `-dxdebug.mode=profile`と`-dxdebug.start_with_request=yes`
+- **出力**: `cachegrind.out.%s`形式でプロファイル生成
+- **最適化**: `-dxdebug.use_compression=0`で解析効率向上
+
+#### xdebug-coverage
+- **必須**: `-dxdebug.mode=coverage`
+- **デバッグ**: `COVERAGE_DEBUG=1`で詳細ログ表示
+- **自動化**: `auto_prepend_file`でカバレッジ収集
+
+#### xdebug-debug
+- **ポート**: 9004使用（IDE競合回避）
+- **並列処理**: AMP使用で3タスク同時実行
+- **タイムアウト**: 接続30秒、実行1時間
 
 **なぜ.xdebugrcアプローチが優れているか:**
 - ✅ php.ini変更不要（システム影響なし）
